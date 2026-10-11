@@ -60,6 +60,29 @@ std::vector<Process> makeIoTestSet() {
   return procs;
 }
 
+// Набор с несколькими I/O-блокировками (эффект конвоя): atTick возрастает и < burstTime
+std::vector<Process> makeConvoySet() {
+  std::vector<Process> procs;
+  auto add = [&](int pid, const std::string& name, std::uint64_t arrival,
+                 std::uint64_t burst, int priority,
+                 std::vector<IoBlock> io = {}) {
+    Process p;
+    p.pid = pid; p.name = name;
+    p.arrivalTime = arrival;
+    p.burstTime = burst;
+    p.remainingTime = burst;
+    p.priority = priority;
+    p.dynamicPriority = priority;
+    p.ioBlocks = std::move(io);
+    procs.push_back(p);
+  };
+  add(1, "CPU1", 0, 20, 2);
+  add(2, "IO1", 1, 6, 1, {{1, 4}, {2, 4}, {3, 4}, {4, 4}, {5, 4}});
+  add(3, "IO2", 2, 6, 1, {{1, 4}, {2, 4}, {3, 4}, {4, 4}, {5, 4}});
+  add(4, "CPU2", 3, 12, 3);
+  return procs;
+}
+
 // Набор для сравнения SJF и HRRN: один длинный процесс L и два коротких
 std::vector<Process> makeHrrnSet() {
   std::vector<Process> procs;
@@ -230,6 +253,24 @@ int main() {
                 << r.avgWaiting << " " << r.avgTurnaround << " " << r.avgResponse
                 << " " << std::setw(3) << r.contextSwitches << " "
                 << std::string(r.contextSwitches, '#') << "\n";
+    }
+  }
+
+  std::cout << "\nЗадание 6: набор с несколькими I/O-блокировками (makeConvoySet)\n";
+  {
+    auto set = makeConvoySet();
+    std::vector<std::unique_ptr<Scheduler>> scheds;
+    scheds.push_back(std::make_unique<FcfsScheduler>(set));
+    scheds.push_back(std::make_unique<SrtnScheduler>(set));
+    scheds.push_back(std::make_unique<RrScheduler>(set, 4));
+    scheds.push_back(std::make_unique<PriorityScheduler>(set, true, true));
+    scheds.push_back(std::make_unique<MlfqScheduler>(set));
+    for (auto& s : scheds) {
+      SimResult r = runSimulation(*s);
+      printResult(r);
+      printProcessTable(s->processes());
+      if (r.algorithm == "FCFS" || r.algorithm == "MLFQ") printGanttLine(r, s->processes());
+      std::cout << "\n";
     }
   }
 
