@@ -109,6 +109,7 @@ void printGantt(const SimResult& r) {
   for (auto& [pid, span] : r.gantt) {
     std::cout << "  [" << span.first << "-" << span.second << ") ";
     if (pid == -1) std::cout << "IDLE\n";
+    else if (pid == -2) std::cout << "CS\n";
     else std::cout << "P" << pid << "\n";
   }
   std::cout << "\n";
@@ -190,6 +191,32 @@ int main() {
     printResult(b);
     printProcessTable(sjf.processes());
     printProcessTable(hrrn.processes());
+  }
+
+  std::cout << "\nЗадание 4: накладные расходы на переключение контекста (makeTestSet)\n";
+  {
+    auto set = makeTestSet();
+    std::cout << "q  | wait(0) turn(0) resp(0) | wait(1) turn(1) resp(1) CPU%(1) overhead%(1)\n";
+    for (std::uint64_t q : {1, 2, 4, 8}) {
+      RrScheduler r0(set, q), r1(set, q);
+      SimResult a = runSimulation(r0, 100000, 0);
+      SimResult b = runSimulation(r1, 100000, 1);
+      std::cout << std::left << std::setw(3) << q << "| " << std::fixed << std::setprecision(2)
+                << std::setw(8) << a.avgWaiting << std::setw(8) << a.avgTurnaround << std::setw(8) << a.avgResponse << "| "
+                << std::setw(8) << b.avgWaiting << std::setw(8) << b.avgTurnaround << std::setw(8) << b.avgResponse
+                << std::setw(8) << b.cpuUtilization << std::setw(8) << b.overheadPercent << "\n";
+    }
+    std::cout << "\nFCFS и SJF с той же стоимостью переключения:\n";
+    for (std::uint64_t cost : {0, 1}) {
+      FcfsScheduler f(set);
+      SjfScheduler s(set);
+      std::cout << "cost=" << cost << ": ";
+      printResult(runSimulation(f, 100000, cost));
+      std::cout << "cost=" << cost << ": ";
+      printResult(runSimulation(s, 100000, cost));
+    }
+    RrScheduler rr(set, 2);
+    printGantt(runSimulation(rr, 100000, 1));
   }
 
   return 0;
