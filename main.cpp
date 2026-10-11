@@ -12,6 +12,7 @@
 #include <iomanip>
 #include <vector>
 #include <memory>
+#include <functional>
 #include <filesystem>
 
 std::vector<Process> makeTestSet() {
@@ -102,6 +103,46 @@ std::vector<Process> makeHrrnSet() {
   add(3, "S1", 4, 2, 1);
   add(4, "S2", 5, 1, 1);
   return procs;
+}
+
+// Сравнение алгоритмов на 5 наборах. Заголовки по-английски: setw считает байты UTF-8
+using Factory = std::function<std::unique_ptr<Scheduler>(const std::vector<Process>&)>;
+template <class T, class... Args>
+Factory factory(Args... args) {
+  return [=](const std::vector<Process>& s) { return std::make_unique<T>(s, args...); };
+}
+
+// metric: функция, достающая нужную метрику из SimResult
+void runExperiment10(const std::string& title, std::function<double(const SimResult&)> metric) {
+  std::vector<std::pair<std::string, Factory>> algos = {
+    {"FCFS", factory<FcfsScheduler>()},
+    {"SJF", factory<SjfScheduler>()},
+    {"SRTN", factory<SrtnScheduler>()},
+    {"HRRN", factory<HrrnScheduler>()},
+    {"RR q=4", factory<RrScheduler>(4)},
+    {"Prio", factory<PriorityScheduler>(false, false)},
+    {"Prio+aging", factory<PriorityScheduler>(true, true)},
+    {"MLFQ", factory<MlfqScheduler>()},
+  };
+  std::cout << title << "\n";
+  std::cout << std::left << std::setw(12) << "Algorithm" << std::right;
+  for (int i = 1; i <= 5; ++i) std::cout << std::setw(9) << "set " + std::to_string(i);
+  std::cout << std::setw(9) << "average" << "\n";
+  for (auto& [label, make] : algos) {
+    std::cout << std::left << std::setw(12) << label << std::right;
+    double sum = 0;
+    for (unsigned seed = 1; seed <= 5; ++seed) {
+      // наборы читаем из файлов sets/setN.txt (так эксперимент повторим на любом компьютере)
+      std::vector<Process> set;
+      loadSet("sets/set" + std::to_string(seed) + ".txt", set);
+      auto sched = make(set);
+      SimResult r = runSimulation(*sched);
+      sum += metric(r);
+      std::cout << std::setw(9) << std::fixed << std::setprecision(2) << metric(r);
+    }
+    std::cout << std::setw(9) << sum / 5 << "\n";
+  }
+  std::cout << "\n";
 }
 
 void printResult(const SimResult& r) {
@@ -272,6 +313,18 @@ int main() {
       if (r.algorithm == "FCFS" || r.algorithm == "MLFQ") printGanttLine(r, s->processes());
       std::cout << "\n";
     }
+  }
+
+  std::cout << "\nЗадание 10: сравнение алгоритмов на 5 случайных наборах\n";
+  {
+    const int sizes[5] = {12, 14, 16, 18, 20};
+    for (unsigned seed = 1; seed <= 5; ++seed) {
+      saveSet("sets/set" + std::to_string(seed) + ".txt", makeRandomSet(seed, sizes[seed - 1]));
+    }
+    runExperiment10("Average waiting time", [](const SimResult& r) { return r.avgWaiting; });
+    runExperiment10("Average turnaround time", [](const SimResult& r) { return r.avgTurnaround; });
+    runExperiment10("Average response time", [](const SimResult& r) { return r.avgResponse; });
+    runExperiment10("CPU utilization, %", [](const SimResult& r) { return r.cpuUtilization; });
   }
 
   return 0;
