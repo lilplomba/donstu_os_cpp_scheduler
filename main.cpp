@@ -340,5 +340,31 @@ int main() {
     printGantt(runSimulation(rr2));
   }
 
+  std::cout << "\nЗадание 7: многоядерный режим (makeTestSet)\n";
+  {
+    auto set = makeTestSet();
+    auto line = [](const SimResult& r) {
+      std::cout << std::left << std::setw(14) << r.algorithm << " | wait=" << std::fixed
+                << std::setprecision(2) << std::setw(6) << r.avgWaiting << " | turn=" << std::setw(6)
+                << r.avgTurnaround << " | resp=" << std::setw(6) << r.avgResponse
+                << " | CPU=" << std::setw(6) << r.cpuUtilization << "% | ticks=" << r.totalTicks << "\n";
+    };
+    for (int cores : {1, 2, 4}) { FcfsScheduler s(set); line(runSimulationMulti(s, cores)); }
+    for (int cores : {1, 2, 4}) { SjfScheduler s(set); line(runSimulationMulti(s, cores)); }
+    for (int cores : {1, 2, 4}) { SrtnScheduler s(set); line(runSimulationMulti(s, cores)); }
+    for (int cores : {1, 2, 4}) { PriorityScheduler s(set, true, false); line(runSimulationMulti(s, cores)); }
+    std::cout << "\nДиаграммы по ядрам, SJF на 2 ядрах:\n";
+    SjfScheduler s(set);
+    SimResult r = runSimulationMulti(s, 2);
+    for (std::size_t c = 0; c < r.coreGantt.size(); ++c) {
+      std::cout << "ядро " << c << ": ";
+      for (auto& [pid, span] : r.coreGantt[c]) {
+        if (pid == -1) std::cout << "idle"; else std::cout << "P" << pid;
+        std::cout << "[" << span.first << "-" << span.second << ") ";
+      }
+      std::cout << "\n";
+    }
+  }
+
   return 0;
 }
