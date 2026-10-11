@@ -118,6 +118,23 @@ void printDeadlines(const std::vector<Process>& procs) {
   }
 }
 
+// Набор-контрпример для задания 11: приходят процессы с убывающим burst
+std::vector<Process> makeChainSet() {
+  std::vector<Process> procs;
+  const std::uint64_t arrival[4] = {0, 1, 2, 3};
+  const std::uint64_t burst[4] = {10, 9, 8, 7};
+  for (int i = 0; i < 4; ++i) {
+    Process p;
+    p.pid = i + 1;
+    p.name = "C" + std::to_string(i + 1);
+    p.arrivalTime = arrival[i];
+    p.burstTime = burst[i];
+    p.remainingTime = burst[i];
+    procs.push_back(p);
+  }
+  return procs;
+}
+
 // Набор для сравнения SJF и HRRN: один длинный процесс L и два коротких
 std::vector<Process> makeHrrnSet() {
   std::vector<Process> procs;
@@ -415,6 +432,23 @@ int main() {
     SrtnScheduler s(set);
     std::cout << "SRTN, набор E: ";
     printGanttLine(runSimulation(s), s.processes());
+  }
+
+  std::cout << "\nЗадание 11: SRTN против SJF при ненулевой стоимости переключения\n";
+  {
+    for (auto& [title, set] : {std::make_pair(std::string("makeTestSet"), makeTestSet()),
+                               std::make_pair(std::string("makeChainSet"), makeChainSet())}) {
+      for (std::uint64_t cost : {0, 1, 3}) {
+        SjfScheduler sjf(set);
+        SrtnScheduler srtn(set);
+        SimResult a = runSimulation(sjf, 100000, cost);
+        SimResult b = runSimulation(srtn, 100000, cost);
+        std::cout << title << ", cost=" << cost << ": SJF wait=" << std::fixed << std::setprecision(2)
+                  << a.avgWaiting << " turn=" << a.avgTurnaround << " CS=" << a.contextSwitches
+                  << " | SRTN wait=" << b.avgWaiting << " turn=" << b.avgTurnaround
+                  << " CS=" << b.contextSwitches << "\n";
+      }
+    }
   }
 
   return 0;
