@@ -1,5 +1,6 @@
 #include "fcfs.h"
 #include "sjf.h"
+#include "hrrn.h"
 #include "srtn.h"
 #include "rr.h"
 #include "priority.h"
@@ -59,6 +60,27 @@ std::vector<Process> makeIoTestSet() {
   return procs;
 }
 
+// Набор для сравнения SJF и HRRN: один длинный процесс L и два коротких
+std::vector<Process> makeHrrnSet() {
+  std::vector<Process> procs;
+  auto add = [&](int pid, const std::string& name, std::uint64_t arrival,
+                 std::uint64_t burst, int priority) {
+    Process p;
+    p.pid = pid; p.name = name;
+    p.arrivalTime = arrival;
+    p.burstTime = burst;
+    p.remainingTime = burst;
+    p.priority = priority;
+    p.dynamicPriority = priority;
+    procs.push_back(p);
+  };
+  add(1, "A", 0, 4, 1);
+  add(2, "L", 1, 6, 1);
+  add(3, "S1", 4, 2, 1);
+  add(4, "S2", 5, 1, 1);
+  return procs;
+}
+
 void printResult(const SimResult& r) {
   std::cout << std::left << std::setw(30) << r.algorithm
             << " | wait=" << std::setw(7) << std::fixed << std::setprecision(2) << r.avgWaiting
@@ -68,6 +90,18 @@ void printResult(const SimResult& r) {
             << " | CS=" << std::setw(4) << r.contextSwitches
             << " | done=" << r.throughput
             << "\n";
+}
+
+// Компактная диаграмма Ганта в одну строку: имя[начало-конец)
+void printGanttLine(const SimResult& r, const std::vector<Process>& procs) {
+  std::cout << r.algorithm << ": ";
+  for (auto& [pid, span] : r.gantt) {
+    if (pid == -1) std::cout << "idle";
+    else if (pid == -2) std::cout << "CS";
+    else for (auto& p : procs) if (p.pid == pid) std::cout << p.name;
+    std::cout << "[" << span.first << "-" << span.second << ") ";
+  }
+  std::cout << "\n";
 }
 
 void printGantt(const SimResult& r) {
@@ -141,6 +175,21 @@ int main() {
     FcfsScheduler a(set), b(loaded);
     printResult(runSimulation(a));
     printResult(runSimulation(b));  // строки должны совпасть
+  }
+
+  std::cout << "\nЗадание 3: SJF и HRRN на наборе A, L, S1, S2\n";
+  {
+    auto set = makeHrrnSet();
+    SjfScheduler sjf(set);
+    HrrnScheduler hrrn(set);
+    SimResult a = runSimulation(sjf);
+    SimResult b = runSimulation(hrrn);
+    printGanttLine(a, sjf.processes());
+    printGanttLine(b, hrrn.processes());
+    printResult(a);
+    printResult(b);
+    printProcessTable(sjf.processes());
+    printProcessTable(hrrn.processes());
   }
 
   return 0;
