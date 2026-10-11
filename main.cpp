@@ -2,6 +2,7 @@
 #include "sjf.h"
 #include "hrrn.h"
 #include "srtn.h"
+#include "edf.h"
 #include "rr.h"
 #include "priority.h"
 #include "mlfq.h"
@@ -82,6 +83,39 @@ std::vector<Process> makeConvoySet() {
   add(3, "IO2", 2, 6, 1, {{1, 4}, {2, 4}, {3, 4}, {4, 4}, {5, 4}});
   add(4, "CPU2", 3, 12, 3);
   return procs;
+}
+
+// Наборы с дедлайнами для EDF
+std::vector<Process> makeDeadlineSet(bool feasible) {
+  std::vector<Process> v;
+  auto add = [&](int pid, const std::string& name, std::uint64_t arrival,
+                 std::uint64_t burst, std::uint64_t deadline) {
+    Process p;
+    p.pid = pid; p.name = name;
+    p.arrivalTime = arrival;
+    p.burstTime = burst;
+    p.remainingTime = burst;
+    p.deadline = deadline;
+    v.push_back(p);
+  };
+  if (feasible) {
+    add(1, "E1", 0, 3, 7);
+    add(2, "E2", 1, 2, 4);
+    add(3, "E3", 2, 2, 9);
+    add(4, "E4", 4, 3, 10);
+  } else {
+    add(1, "F1", 0, 4, 5);
+    add(2, "F2", 1, 3, 5);
+    add(3, "F3", 2, 2, 6);
+  }
+  return v;
+}
+
+void printDeadlines(const std::vector<Process>& procs) {
+  for (const auto& p : procs) {
+    std::cout << p.name << ": finish=" << p.finishTime << " deadline=" << p.deadline
+              << (p.finishTime <= p.deadline ? " OK" : " MISSED") << "\n";
+  }
 }
 
 // Набор для сравнения SJF и HRRN: один длинный процесс L и два коротких
@@ -364,6 +398,23 @@ int main() {
       }
       std::cout << "\n";
     }
+  }
+
+  std::cout << "\nЗадание 12: EDF\n";
+  {
+    for (bool feasible : {true, false}) {
+      auto set = makeDeadlineSet(feasible);
+      EdfScheduler s(set);
+      SimResult r = runSimulation(s);
+      std::cout << "Набор " << (feasible ? "E" : "F") << ": ";
+      printGanttLine(r, s.processes());
+      printDeadlines(s.processes());
+    }
+    // для сравнения: SRTN на наборе E
+    auto set = makeDeadlineSet(true);
+    SrtnScheduler s(set);
+    std::cout << "SRTN, набор E: ";
+    printGanttLine(runSimulation(s), s.processes());
   }
 
   return 0;
