@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <vector>
 #include <memory>
+#include <filesystem>
 
 std::vector<Process> makeTestSet() {
   std::vector<Process> procs;
@@ -80,6 +81,9 @@ void printGantt(const SimResult& r) {
 }
 
 int main() {
+  // папки для наборов и результатов (запускать из корня проекта)
+  std::filesystem::create_directories("sets");
+  std::filesystem::create_directories("results");
   std::cout << "Case 1: CPU-bound\n";
   {
     auto set1 = makeTestSet();
@@ -123,6 +127,20 @@ int main() {
     SimResult r = runSimulation(rr);
     std::cout << "\nПо процессам, RR (q=2):\n";
     printProcessTable(rr.processes());
+  }
+
+  {
+    auto set = makeTestSet();
+    saveSet("sets/set_basic.txt", set);
+    std::vector<Process> loaded;
+    if (!loadSet("sets/set_basic.txt", loaded)) {
+      std::cerr << "Не удалось загрузить sets/set_basic.txt\n";
+      return 1;
+    }
+    std::cout << "\nПроверка сохранения/загрузки (FCFS: исходный и загруженный набор):\n";
+    FcfsScheduler a(set), b(loaded);
+    printResult(runSimulation(a));
+    printResult(runSimulation(b));  // строки должны совпасть
   }
 
   return 0;
