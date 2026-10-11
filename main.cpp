@@ -327,5 +327,18 @@ int main() {
     runExperiment10("CPU utilization, %", [](const SimResult& r) { return r.cpuUtilization; });
   }
 
+  {
+    // Задание 9: диаграммы Ганта в CSV (картинки рисует plot_gantt.py)
+    auto set = makeTestSet();
+    RrScheduler rr(set, 2);
+    saveGanttCsv("results/gantt_rr2.csv", runSimulation(rr));
+    MlfqScheduler mlfq(set);
+    saveGanttCsv("results/gantt_mlfq.csv", runSimulation(mlfq));
+    std::cout << "\nЗадание 9: сохранены results/gantt_rr2.csv и results/gantt_mlfq.csv\n";
+    // для сверки с картинкой — текстовая диаграмма тех же прогонов
+    RrScheduler rr2(set, 2);
+    printGantt(runSimulation(rr2));
+  }
+
   return 0;
 }
